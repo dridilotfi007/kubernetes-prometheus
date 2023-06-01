@@ -8,15 +8,15 @@ metadata:
 data:
   prometheus.rules: |-
     groups:
-    - name: devopscube demo alert
+    - name: deployment unavailable
       rules:
-      - alert: High Pod Memory
-        expr: sum(container_memory_usage_bytes) > 1
-        for: 1m
+      - alert: unavailableDeployment
+        expr: sum(kube_deployment_status_replicas_available{namespace="default", deployment="pfe-app"}) == 0
+        for: 10s
         labels:
-          severity: slack
+          severity: critical
         annotations:
-          summary: High Memory Usage
+          summary: Deployment pfe-app became unavailable
   prometheus.yml: |-
     global:
       scrape_interval: 5s
@@ -27,8 +27,7 @@ data:
       alertmanagers:
       - scheme: http
         static_configs:
-        - targets:
-          - "alertmanager.monitoring.svc:9093"
+        - targets: ["192.168.1.20:31001"]
     scrape_configs:
       - job_name: 'node-exporter'
         kubernetes_sd_configs:
@@ -59,11 +58,11 @@ data:
         - action: labelmap
           regex: __meta_kubernetes_node_label_(.+)
         - target_label: __address__
-          replacement: kubernetes.default.svc:443
+          replacement: "192.168.1.20:6443"
         - source_labels: [__meta_kubernetes_node_name]
           regex: (.+)
           target_label: __metrics_path__
-          replacement: /api/v1/nodes/${1}/proxy/metrics
+          replacement: /metrics
       - job_name: 'kubernetes-pods'
         kubernetes_sd_configs:
         - role: pod
@@ -90,23 +89,8 @@ data:
           target_label: kubernetes_pod_name
       - job_name: 'kube-state-metrics'
         static_configs:
-          - targets: ['kube-state-metrics.kube-system.svc.cluster.local:8080']
-      - job_name: 'kubernetes-cadvisor'
-        scheme: https
-        tls_config:
-          ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
-        bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
-        kubernetes_sd_configs:
-        - role: node
-        relabel_configs:
-        - action: labelmap
-          regex: __meta_kubernetes_node_label_(.+)
-        - target_label: __address__
-          replacement: kubernetes.default.svc:443
-        - source_labels: [__meta_kubernetes_node_name]
-          regex: (.+)
-          target_label: __metrics_path__
-          replacement: /api/v1/nodes/${1}/proxy/metrics/cadvisor
+          - targets: ['192.168.1.20:31910']
+
       - job_name: 'kubernetes-service-endpoints'
         kubernetes_sd_configs:
         - role: endpoints
